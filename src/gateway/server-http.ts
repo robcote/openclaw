@@ -75,6 +75,18 @@ type HookDispatchers = {
   }) => string;
 };
 
+/**
+ * Apply security headers to all gateway HTTP responses.
+ * Hardens against clickjacking, MIME sniffing, and cross-origin leakage.
+ */
+function applyGatewaySecurityHeaders(res: ServerResponse) {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Content-Security-Policy", "frame-ancestors 'none'");
+}
+
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -157,8 +169,23 @@ export function createHooksRequestHandler(
     clientKey: string,
     nowMs: number,
   ): { throttled: boolean; retryAfterSeconds?: number } => {
+    // LRU eviction: when the tracking table is full, evict the oldest entry
+    // instead of clearing the entire table, preventing an attacker from resetting
+    // all rate-limit state by exhausting the table with distinct IPs.
     if (!hookAuthFailures.has(clientKey) && hookAuthFailures.size >= HOOK_AUTH_FAILURE_TRACK_MAX) {
-      hookAuthFailures.clear();
+      // First pass: evict expired entries
+      for (const [key, entry] of hookAuthFailures) {
+        if (nowMs - entry.windowStartedAtMs >= HOOK_AUTH_FAILURE_WINDOW_MS) {
+          hookAuthFailures.delete(key);
+        }
+      }
+      // If still full, evict the oldest entry (LRU - first inserted in Map)
+      if (hookAuthFailures.size >= HOOK_AUTH_FAILURE_TRACK_MAX) {
+        const oldestKey = hookAuthFailures.keys().next().value;
+        if (oldestKey !== undefined) {
+          hookAuthFailures.delete(oldestKey);
+        }
+      }
     }
     const current = hookAuthFailures.get(clientKey);
     const expired = !current || nowMs - current.windowStartedAtMs >= HOOK_AUTH_FAILURE_WINDOW_MS;
@@ -400,6 +427,9 @@ export function createGatewayHttpServer(opts: {
     if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") {
       return;
     }
+
+    // Apply security headers to all HTTP responses.
+    applyGatewaySecurityHeaders(res);
 
     try {
       const configSnapshot = loadConfig();

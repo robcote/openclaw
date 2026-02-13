@@ -66,7 +66,8 @@ type DevicePairingStateFile = {
   pairedByDeviceId: Record<string, PairedDevice>;
 };
 
-const PENDING_TTL_MS = 5 * 60 * 1000;
+// Reduced from 5 minutes to 2 minutes to limit the window for stale pairing requests.
+const PENDING_TTL_MS = 2 * 60 * 1000;
 
 function resolvePaths(baseDir?: string) {
   const root = baseDir ?? resolveStateDir();

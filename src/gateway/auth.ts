@@ -200,6 +200,9 @@ export function resolveGatewayAuth(params: {
   };
 }
 
+const MIN_PASSWORD_LENGTH = 12;
+const MIN_TOKEN_LENGTH = 24;
+
 export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
   if (auth.mode === "token" && !auth.token) {
     if (auth.allowTailscale) {
@@ -209,8 +212,18 @@ export function assertGatewayAuthConfigured(auth: ResolvedGatewayAuth): void {
       "gateway auth mode is token, but no token was configured (set gateway.auth.token or OPENCLAW_GATEWAY_TOKEN)",
     );
   }
+  if (auth.mode === "token" && auth.token && auth.token.length < MIN_TOKEN_LENGTH) {
+    throw new Error(
+      `gateway auth token is too short (${auth.token.length} chars, minimum ${MIN_TOKEN_LENGTH}). Use a strong, randomly generated token.`,
+    );
+  }
   if (auth.mode === "password" && !auth.password) {
     throw new Error("gateway auth mode is password, but no password was configured");
+  }
+  if (auth.mode === "password" && auth.password && auth.password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error(
+      `gateway auth password is too short (${auth.password.length} chars, minimum ${MIN_PASSWORD_LENGTH}). Use a strong password.`,
+    );
   }
 }
 
