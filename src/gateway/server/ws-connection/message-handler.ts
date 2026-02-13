@@ -56,7 +56,9 @@ import {
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
 
-const DEVICE_SIGNATURE_SKEW_MS = 10 * 60 * 1000;
+// Reduced from 10 minutes to 5 minutes to narrow the replay attack window
+// while still accommodating reasonable clock drift between devices.
+const DEVICE_SIGNATURE_SKEW_MS = 5 * 60 * 1000;
 
 function resolveHostName(hostHeader?: string): string {
   const host = (hostHeader ?? "").trim().toLowerCase();
@@ -236,8 +238,27 @@ export function attachGatewayWsMessageHandler(params: {
       return;
     }
     const text = rawDataToString(data);
+    // Early guard: reject oversized or empty messages before JSON parsing
+    // to prevent JSON.parse from consuming excessive CPU on malformed payloads.
+    if (!text || text.length > MAX_PAYLOAD_BYTES) {
+      logWsControl.warn(
+        `rejected message: ${!text ? "empty" : "oversized"} conn=${connId} size=${text?.length ?? 0}`,
+      );
+      if (!getClient()) {
+        close(1009, "message too large");
+      }
+      return;
+    }
     try {
       const parsed = JSON.parse(text);
+      // Early structural validation: all WebSocket frames must be plain objects.
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        logWsControl.warn(`rejected non-object frame conn=${connId} type=${typeof parsed}`);
+        if (!getClient()) {
+          close(1008, "invalid frame: expected object");
+        }
+        return;
+      }
       const frameType =
         parsed && typeof parsed === "object" && "type" in parsed
           ? typeof (parsed as { type?: unknown }).type === "string"

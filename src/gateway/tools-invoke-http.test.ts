@@ -135,14 +135,14 @@ describe("POST /tools/invoke", () => {
     const port = await getFreePort();
     const server = await startGatewayServer(port, {
       bind: "loopback",
-      auth: { mode: "password", password: "secret" },
+      auth: { mode: "password", password: "test-password-secure-enough" },
     });
 
     const res = await fetch(`http://127.0.0.1:${port}/tools/invoke`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        authorization: "Bearer secret",
+        authorization: "Bearer test-password-secure-enough",
       },
       body: JSON.stringify({ tool: "agents_list", action: "json", args: {}, sessionKey: "main" }),
     });
@@ -222,7 +222,7 @@ describe("POST /tools/invoke", () => {
     const port = await getFreePort();
     const server = await startGatewayServer(port, {
       bind: "loopback",
-      auth: { mode: "token", token: "t" },
+      auth: { mode: "token", token: "test-token-that-is-long-enough" },
     });
 
     const res = await fetch(`http://127.0.0.1:${port}/tools/invoke`, {

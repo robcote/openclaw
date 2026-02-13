@@ -78,12 +78,10 @@ export function loadOrCreateDeviceIdentity(filePath: string = DEFAULT_FILE): Dev
             ...parsed,
             deviceId: derivedId,
           };
+          // Write with restricted permissions; mode on writeFileSync is sufficient.
+          // Avoid a separate chmodSync to eliminate the TOCTOU race window where
+          // the file could be briefly readable between write and chmod.
           fs.writeFileSync(filePath, `${JSON.stringify(updated, null, 2)}\n`, { mode: 0o600 });
-          try {
-            fs.chmodSync(filePath, 0o600);
-          } catch {
-            // best-effort
-          }
           return {
             deviceId: derivedId,
             publicKeyPem: parsed.publicKeyPem,
@@ -110,12 +108,8 @@ export function loadOrCreateDeviceIdentity(filePath: string = DEFAULT_FILE): Dev
     privateKeyPem: identity.privateKeyPem,
     createdAtMs: Date.now(),
   };
+  // Write with restricted permissions; mode on writeFileSync is sufficient.
   fs.writeFileSync(filePath, `${JSON.stringify(stored, null, 2)}\n`, { mode: 0o600 });
-  try {
-    fs.chmodSync(filePath, 0o600);
-  } catch {
-    // best-effort
-  }
   return identity;
 }
 

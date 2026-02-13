@@ -25,6 +25,13 @@ const SUSPICIOUS_PATTERNS = [
   /delete\s+all\s+(emails?|files?|data)/i,
   /<\/?system>/i,
   /\]\s*\n\s*\[?(system|assistant|user)\]?:/i,
+  // Additional injection patterns
+  /\bact\s+as\s+(if\s+you\s+are|a|an|my)\b/i,
+  /\boverride\s+(safety|security|restrictions?|rules?)\b/i,
+  /\bjailbreak\b/i,
+  /\bdan\s*mode\b/i,
+  /\bdo\s+anything\s+now\b/i,
+  /\bbypass\s+(filters?|safety|restrictions?|moderation)\b/i,
 ];
 
 /**
@@ -106,7 +113,12 @@ function foldMarkerChar(char: string): string {
 }
 
 function foldMarkerText(input: string): string {
-  return input.replace(/[\uFF21-\uFF3A\uFF41-\uFF5A\uFF1C\uFF1E]/g, (char) => foldMarkerChar(char));
+  // Apply NFKC normalization first to catch combining characters and other
+  // Unicode tricks that could bypass the fullwidth-only folding below.
+  const normalized = input.normalize("NFKC");
+  return normalized.replace(/[\uFF21-\uFF3A\uFF41-\uFF5A\uFF1C\uFF1E]/g, (char) =>
+    foldMarkerChar(char),
+  );
 }
 
 function replaceMarkers(content: string): string {

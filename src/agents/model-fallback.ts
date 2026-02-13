@@ -5,7 +5,7 @@ import {
   isProfileInCooldown,
   resolveAuthProfileOrder,
 } from "./auth-profiles.js";
-import { DEFAULT_MODEL, DEFAULT_PROVIDER } from "./defaults.js";
+import { DEFAULT_FALLBACK_MODELS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "./defaults.js";
 import {
   coerceToFailoverError,
   describeFailoverError,
@@ -182,9 +182,10 @@ function resolveFallbackCandidates(params: {
       | string
       | undefined;
     if (model && typeof model === "object") {
-      return model.fallbacks ?? [];
+      return model.fallbacks ?? [...DEFAULT_FALLBACK_MODELS];
     }
-    return [];
+    // Use the Claude-centric default fallback chain when no fallbacks are configured.
+    return [...DEFAULT_FALLBACK_MODELS];
   })();
 
   for (const raw of modelFallbacks) {

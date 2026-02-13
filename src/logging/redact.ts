@@ -105,7 +105,17 @@ function redactText(text: string, patterns: RegExp[]): string {
   return next;
 }
 
+// Cache the redaction config at startup to avoid re-loading the config module
+// on every log line, which adds latency and creates a circular dependency risk.
+let cachedRedactOptions: RedactOptions | null = null;
+let cachedRedactOptionsLoadedAtMs = 0;
+const REDACT_CACHE_TTL_MS = 30_000;
+
 function resolveConfigRedaction(): RedactOptions {
+  const now = Date.now();
+  if (cachedRedactOptions && now - cachedRedactOptionsLoadedAtMs < REDACT_CACHE_TTL_MS) {
+    return cachedRedactOptions;
+  }
   let cfg: OpenClawConfig["logging"] | undefined;
   try {
     const loaded = requireConfig("../config/config.js") as {
@@ -115,10 +125,12 @@ function resolveConfigRedaction(): RedactOptions {
   } catch {
     cfg = undefined;
   }
-  return {
+  cachedRedactOptions = {
     mode: normalizeMode(cfg?.redactSensitive),
     patterns: cfg?.redactPatterns,
   };
+  cachedRedactOptionsLoadedAtMs = now;
+  return cachedRedactOptions;
 }
 
 export function redactSensitiveText(text: string, options?: RedactOptions): string {
